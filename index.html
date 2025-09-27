@@ -39,7 +39,7 @@
     .btn:active{transform:translateY(1px)}
 
     /* Stages */
-    .stage{position:absolute; inset:64px 0 0 0; display:none; place-items:center; padding:24px; z-index:20}
+    .stage{position:absolute; inset:64px 0 0 0; display:none; place-items:center; padding:24px; z-index:20; overflow:auto }
     .stage.active{display:grid}
 
     /* Stage 1 – Splash */
@@ -49,6 +49,14 @@
     @keyframes shimmer{0%{background-position:0 0}100%{background-position:300% 0}}
     .sub{opacity:.9; margin-top:10px; font-size:clamp(14px,2.6vw,20px)}
     .cta{margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap}
+
+/* Mobil görünürlük iyileştirme */
+@media (max-width: 600px){
+  .bubble-area{width:92vw; height:44vh; border-radius:20px}
+  .progress{width:92vw}
+  /* Stage içinde kaydırma aktif; CTA yapışkan olsun ki buton hep görünsün */
+  #stage2 .cta{position:sticky; bottom:12px; padding:8px 0; background:linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.25)); backdrop-filter:blur(4px)}
+}
 
     /* Stage 2 – Playful (no win/lose) */
     .play{display:grid; place-items:center; gap:18px; text-align:center}
@@ -88,7 +96,7 @@
   <canvas id="confetti"></canvas>
 
   <div class="topbar">
-    <div class="brand"><div class="logo">💖</div><span>Sevgi Şöleni</span></div>
+    <div class="brand"><div class="logo">💖</div><span>Hediye Şöleni</span></div>
     <div class="controls">
       <button class="btn" id="btnRain">💘 Kalp Yağmuru</button>
       <!-- İLERİ butonu kaldırıldı -->
