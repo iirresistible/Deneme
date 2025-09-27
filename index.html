@@ -62,6 +62,8 @@
     .play{display:grid; place-items:center; gap:18px; text-align:center}
     .bubble-area{position:relative; width:min(900px,92vw); height:58vh; border-radius:24px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.16);
       box-shadow:0 30px 80px rgba(0,0,0,.35) inset, 0 10px 40px rgba(0,0,0,.25)}
+@media (max-width:600px){.bubble-area{box-shadow:0 12px 26px rgba(0,0,0,.25) inset, 0 6px 16px rgba(0,0,0,.18)} .btn{padding:12px 16px; font-size:16px}}
+
     .tip{opacity:.9}
     .progress{height:12px; width:min(640px,90vw); background:rgba(255,255,255,.12); border-radius:999px; overflow:hidden; border:1px solid rgba(255,255,255,.18)}
     .bar{height:100%; width:0%; background:linear-gradient(90deg,#ff3b8d,#ffd166); box-shadow:0 10px 30px rgba(255,59,141,.4)}
@@ -145,84 +147,117 @@
   <script>
     const $ = s=>document.querySelector(s);
     const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+
+    // ===== Mobile/perf tuning =====
+    const IS_MOBILE = matchMedia('(max-width: 600px)').matches;
+    const DPR = Math.min(window.devicePixelRatio||1, IS_MOBILE ? 1.25 : 1.75); // sınırla
+    const FRAME_SKIP = IS_MOBILE ? 1 : 0; // mobile'da her 2 karede bir çiz
+    const LIMITS = {
+      sparkles: IS_MOBILE?120:240,
+      hearts:   IS_MOBILE?140:260,
+      confetti: IS_MOBILE?120:240
+    };
+
     const spark=$('#spark'), hearts=$('#hearts'), confetti=$('#confetti');
     const ctxS=spark.getContext('2d'), ctxH=hearts.getContext('2d'), ctxC=confetti.getContext('2d');
-    function fit(){[spark,hearts,confetti].forEach(c=>{c.width=innerWidth; c.height=innerHeight})} window.addEventListener('resize',fit); fit();
+    function fit(){
+      [spark,hearts,confetti].forEach(c=>{ c.width=innerWidth*DPR; c.height=innerHeight*DPR; });
+      [ctxS,ctxH,ctxC].forEach(ctx=>ctx.setTransform(DPR,0,0,DPR,0,0));
+    }
+    addEventListener('resize', fit, {passive:true}); fit();
 
     // Tiny helper: vibration on mobile
     const vib = ms => (navigator.vibrate? navigator.vibrate(ms): null);
 
-    // Sparkles
-    const sparkles=[]; window.addEventListener('pointermove',e=>{for(let i=0;i<4;i++) sparkles.push({x:e.clientX,y:e.clientY,vx:(Math.random()-.5)*2,vy:-Math.random()*2-1,life:50+Math.random()*30})});
-    function drawSpark(){ctxS.clearRect(0,0,spark.width,spark.height); for(let i=sparkles.length-1;i>=0;i--){const p=sparkles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.03; p.life-=1.8; const a=clamp(p.life/80,0,1); ctxS.fillStyle=`rgba(255,255,255,${a})`; ctxS.beginPath(); ctxS.arc(p.x,p.y,2+a*2,0,Math.PI*2); ctxS.fill(); if(p.life<=0) sparkles.splice(i,1);}}
+    // Sparkles (reduced rate on mobile)
+    const sparkles=[];
+    addEventListener('pointermove',e=>{
+      const burst = IS_MOBILE?2:4;
+      for(let i=0;i<burst;i++) sparkles.push({x:e.clientX,y:e.clientY,vx:(Math.random()-.5)*2,vy:-Math.random()*2-1,life:50+Math.random()*30});
+      if(sparkles.length>LIMITS.sparkles) sparkles.splice(0, sparkles.length-LIMITS.sparkles);
+    }, {passive:true});
+    function drawSpark(){
+      ctxS.clearRect(0,0,innerWidth,innerHeight);
+      for(let i=sparkles.length-1;i>=0;i--){const p=sparkles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.03; p.life-=1.8; const a=clamp(p.life/80,0,1); ctxS.fillStyle=`rgba(255,255,255,${a})`; ctxS.beginPath(); ctxS.arc(p.x,p.y,2+a*2,0,Math.PI*2); ctxS.fill(); if(p.life<=0) sparkles.splice(i,1);} }
 
     // Hearts rain
     const drops=[]; function heartPath(ctx,x,y,s){ctx.beginPath(); const k=s/16; ctx.moveTo(x,y+2*k); ctx.bezierCurveTo(x-7*k,y-6*k,x-16*k,y+4*k,x,y+14*k); ctx.bezierCurveTo(x+16*k,y+4*k,x+7*k,y-6*k,x,y+2*k); ctx.closePath();}
-    function spawnHeart(x=Math.random()*hearts.width, big=false){const size=big?(20+Math.random()*30):(8+Math.random()*18); drops.push({x,y:-size,vy:1+Math.random()*2.5,rot:Math.random()*Math.PI,vr:(Math.random()-.5)*0.03,size});}
-    function drawHearts(){ctxH.clearRect(0,0,hearts.width,hearts.height); for(let i=drops.length-1;i>=0;i--){const d=drops[i]; d.y+=d.vy; d.rot+=d.vr; ctxH.save(); ctxH.translate(d.x,d.y); ctxH.rotate(d.rot); const g=ctxH.createRadialGradient(0,0,1,0,0,d.size); g.addColorStop(0,'rgba(255,255,255,.95)'); g.addColorStop(.2,'#ff7ab6'); g.addColorStop(1,'#ff3b8d'); ctxH.fillStyle=g; heartPath(ctxH,0,0,d.size); ctxH.fill(); ctxH.restore(); if(d.y>hearts.height+d.size) drops.splice(i,1);}}
-    let rainTimer=null; function heartRain(onceBurst=false){ if(rainTimer){clearInterval(rainTimer); rainTimer=null; return;} if(onceBurst){ for(let i=0;i<180;i++){ setTimeout(()=>spawnHeart(Math.random()*hearts.width,true), i*3); } setTimeout(()=>{rainTimer=setInterval(()=>{for(let i=0;i<6;i++) spawnHeart();},160); setTimeout(()=>{clearInterval(rainTimer); rainTimer=null;},6000)},600)} else {rainTimer=setInterval(()=>{for(let i=0;i<6;i++) spawnHeart();},160);} }
+    function spawnHeart(x=Math.random()*innerWidth, big=false){const size=big?(IS_MOBILE?16+Math.random()*18:20+Math.random()*30):(8+Math.random()*18); drops.push({x,y:-size,vy:1+Math.random()*2.2,rot:Math.random()*Math.PI,vr:(Math.random()-.5)*0.03,size}); if(drops.length>LIMITS.hearts) drops.splice(0,drops.length-LIMITS.hearts); }
+    function drawHearts(){ctxH.clearRect(0,0,innerWidth,innerHeight); for(let i=drops.length-1;i>=0;i--){const d=drops[i]; d.y+=d.vy; d.rot+=d.vr; ctxH.save(); ctxH.translate(d.x,d.y); ctxH.rotate(d.rot); const g=ctxH.createRadialGradient(0,0,1,0,0,d.size); g.addColorStop(0,'rgba(255,255,255,.95)'); g.addColorStop(.2,'#ff7ab6'); g.addColorStop(1,'#ff3b8d'); ctxH.fillStyle=g; heartPath(ctxH,0,0,d.size); ctxH.fill(); ctxH.restore(); if(d.y>innerHeight+d.size) drops.splice(i,1);} }
+    let rainTimer=null, burstTO=null;
+    function heartRain(onceBurst=false){
+      if(rainTimer){clearInterval(rainTimer); rainTimer=null;}
+      if(burstTO){clearTimeout(burstTO); burstTO=null;}
+      if(onceBurst){ const count = IS_MOBILE?60:180; for(let i=0;i<count;i++){ setTimeout(()=>spawnHeart(Math.random()*innerWidth,true), i*(IS_MOBILE?6:3)); }
+        burstTO = setTimeout(()=>{ rainTimer=setInterval(()=>{ for(let i=0;i<(IS_MOBILE?3:6); i++) spawnHeart(); }, IS_MOBILE?200:160); setTimeout(()=>{clearInterval(rainTimer); rainTimer=null;}, IS_MOBILE?4500:6000); }, 600);
+      } else { rainTimer=setInterval(()=>{ for(let i=0;i<(IS_MOBILE?3:6); i++) spawnHeart(); }, IS_MOBILE?200:160); }
+    }
 
     // Confetti
-    const confs=[]; function spawnConfetti(x,y,amt=140){for(let i=0;i<amt;i++){const ang=Math.random()*Math.PI*2, sp=2+Math.random()*5; confs.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-2,w:4+Math.random()*6,h:2+Math.random()*4,r:Math.random()*Math.PI,vr:(Math.random()-.5)*0.2,life:160+Math.random()*80,hue:~~(Math.random()*360)});}}
-    function drawConfetti(){ctxC.clearRect(0,0,confetti.width,confetti.height); for(let i=confs.length-1;i>=0;i--){const c=confs[i]; c.x+=c.vx; c.y+=c.vy; c.vy+=0.05; c.r+=c.vr; c.life-=1.6; ctxC.save(); ctxC.translate(c.x,c.y); ctxC.rotate(c.r); ctxC.fillStyle=`hsl(${c.hue} 90% 60% / ${clamp(c.life/200,0,1)})`; ctxC.fillRect(-c.w/2,-c.h/2,c.w,c.h); ctxC.restore(); if(c.life<=0||c.y>confetti.height+20) confs.splice(i,1);}}
+    const confs=[]; function spawnConfetti(x,y,amt=IS_MOBILE?90:140){ for(let i=0;i<amt;i++){const ang=Math.random()*Math.PI*2, sp=2+Math.random()*5; confs.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-2,w:4+Math.random()*6,h:2+Math.random()*4,r:Math.random()*Math.PI,vr:(Math.random()-.5)*0.2,life:160+Math.random()*80,hue:~~(Math.random()*360)}); } if(confs.length>LIMITS.confetti) confs.splice(0, confs.length-LIMITS.confetti); }
+    function drawConfetti(){ ctxC.clearRect(0,0,innerWidth,innerHeight); for(let i=confs.length-1;i>=0;i--){const c=confs[i]; c.x+=c.vx; c.y+=c.vy; c.vy+=0.05; c.r+=c.vr; c.life-=1.6; ctxC.save(); ctxC.translate(c.x,c.y); ctxC.rotate(c.r); ctxC.fillStyle=`hsl(${c.hue} 90% 60% / ${clamp(c.life/200,0,1)})`; ctxC.fillRect(-c.w/2,-c.h/2,c.w,c.h); ctxC.restore(); if(c.life<=0||c.y>innerHeight+20) confs.splice(i,1);} }
 
-    // Loop
-    let raf; (function loop(){ drawSpark(); drawHearts(); drawConfetti(); raf=requestAnimationFrame(loop); })();
+    // Loop (visibility + frame skip)
+    let raf, frame=0, paused=false;
+    function loop(){
+      if(paused){ return; }
+      if(FRAME_SKIP && (frame++ % (FRAME_SKIP+1))!==0){ raf=requestAnimationFrame(loop); return; }
+      drawSpark(); drawHearts(); drawConfetti();
+      raf=requestAnimationFrame(loop);
+    }
+    function startRAF(){ if(!paused){ cancelAnimationFrame(raf);} paused=false; frame=0; raf=requestAnimationFrame(loop); }
+    function stopRAF(){ paused=true; cancelAnimationFrame(raf); }
+    startRAF();
+    document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopRAF(); else startRAF(); }, {passive:true});
 
     // Navigation
     const st1=$('#stage1'), st2=$('#stage2'), st3=$('#stage3');
     function go(s){ [st1,st2,st3].forEach(el=>el.classList.remove('active')); s.classList.add('active'); }
 
     // Stage 1 actions
-    $('#startGift').addEventListener('click',()=>{ heartRain(true); spawnConfetti(innerWidth*0.5, innerHeight*0.35, 220); setTimeout(()=>go(st2), 1800); vib(20); });
+    $('#startGift').addEventListener('click',()=>{ heartRain(true); spawnConfetti(innerWidth*0.5, innerHeight*0.35); setTimeout(()=>go(st2), 1400); vib(20); }, {passive:true});
 
     // Stage 2 actions (no win/lose) - slower progress
     const area=$('#area'), bar=$('#bar'), toLetter=$('#toLetter'); let filled=0;
     area.addEventListener('pointerdown', e=>{
-      vib(15);
+      vib(10);
       const rect=area.getBoundingClientRect(); const x=e.clientX-rect.left, y=e.clientY-rect.top;
-      for(let i=0;i<6;i++){ const el=document.createElement('div'); el.className='float-emoji'; el.textContent=Math.random()<.5?'💖':'🎈'; area.appendChild(el); el.style.left=x+'px'; el.style.top=y+'px'; const tx=x+(Math.random()*200-100), ty=y-(80+Math.random()*120); el.animate([{transform:'translate(0,0) scale(1)', opacity:1},{transform:`translate(${tx-x}px, ${ty-y}px) scale(1.6)`, opacity:0}],{duration:1200,easing:'cubic-bezier(.2,.8,.2,1)'}); setTimeout(()=>el.remove(),1200); }
-      // slower progress increments
-      filled = clamp(filled + (2 + Math.random()*3), 0, 100); bar.style.width = filled+'%';
-      for(let i=0;i<8;i++) spawnHeart(rect.left + x + (Math.random()*120-60), true);
-      if(Math.random()<0.35) spawnConfetti(rect.left + x, rect.top + y, 60);
+      const burst = IS_MOBILE?3:6;
+      for(let i=0;i<burst;i++){ const el=document.createElement('div'); el.className='float-emoji'; el.textContent=Math.random()<.6?'💖':'🎈'; area.appendChild(el); el.style.left=x+'px'; el.style.top=y+'px'; const tx=x+(Math.random()*160-80), ty=y-(70+Math.random()*110); el.animate([{transform:'translate(0,0) scale(1)', opacity:1},{transform:`translate(${tx-x}px, ${ty-y}px) scale(1.5)`, opacity:0}],{duration:1000,easing:'cubic-bezier(.2,.8,.2,1)'}); setTimeout(()=>el.remove(),1000); }
+      filled = clamp(filled + (IS_MOBILE?2:3) + Math.random()*2, 0, 100); bar.style.width = filled+'%';
+      for(let i=0;i<(IS_MOBILE?4:8);i++) spawnHeart(rect.left + x + (Math.random()*100-50), true);
+      if(Math.random()< (IS_MOBILE?0.22:0.35)) spawnConfetti(rect.left + x, rect.top + y, IS_MOBILE?40:60);
       if(filled>=100){ toLetter.disabled=false; toLetter.textContent='💌 Mektuba Geç'; }
-    });
-    toLetter.addEventListener('click',()=>{ go(st3); spawnConfetti(innerWidth*0.5, innerHeight*0.32, 200); vib(20); });
+    }, {passive:true});
+    toLetter.addEventListener('click',()=>{ go(st3); spawnConfetti(innerWidth*0.5, innerHeight*0.32, IS_MOBILE?120:200); vib(16); }, {passive:true});
 
     // Stage 3 – Letter playful behavior (10 hops)
     const wrap=$('#wrap'), env=$('#envelope'), note=$('#note'); let clicks=0; const HOPS=10;
-    function randomPlace(){ const pad=20; const maxX=innerWidth-260-pad; const maxY=innerHeight-180-pad-64; const nx=pad+Math.random()*maxX; const ny=64+pad+Math.random()*maxY; wrap.style.position='fixed'; wrap.style.left=nx+'px'; wrap.style.top=ny+'px'; wrap.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:300}); }
+    function randomPlace(){ const pad=16; const W=260, H=180; const maxX=innerWidth-W-pad; const maxY=innerHeight-H-pad-64; const nx=pad+Math.random()*maxX; const ny=64+pad+Math.random()*maxY; wrap.style.position='fixed'; wrap.style.left=nx+'px'; wrap.style.top=ny+'px'; wrap.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:280}); }
 
     wrap.addEventListener('click',()=>{
-      vib(20);
+      vib(18);
       clicks++;
-      if(clicks < HOPS){ randomPlace(); const r=wrap.getBoundingClientRect(); spawnConfetti(r.left+130, r.top+90, 100); }
-      if(clicks === HOPS){ env.classList.add('open'); setTimeout(()=>{ note.classList.add('show'); spawnConfetti(innerWidth*0.5, innerHeight*0.4, 260); }, 500); }
-    });
+      if(clicks < HOPS){ randomPlace(); const r=wrap.getBoundingClientRect(); spawnConfetti(r.left+130, r.top+90, IS_MOBILE?70:100); }
+      if(clicks === HOPS){ env.classList.add('open'); setTimeout(()=>{ note.classList.add('show'); spawnConfetti(innerWidth*0.5, innerHeight*0.4, IS_MOBILE?180:260); }, 420); }
+    }, {passive:true});
 
-    // ===== Romantic background melody (WebAudio synth) =====
+    // ===== Romantic background melody (WebAudio synth) ===== (unchanged but gated by button)
     let ctx=null, master=null; let musicOn=false; let loopTimer=null;
     function scheduleMelody(){
-      if(!ctx) return; const bpm=72; const bar=(60/bpm)*4; // 4/4 bar
-      const chords=[[261.63,329.63,392.00],[220.00,261.63,329.63],[174.61,220.00,261.63],[196.00,246.94,293.66]]; // C - Am - F - G-ish
-      const now=ctx.currentTime; for(let i=0;i<4;i++){ const base= now + i*bar; const ch=chords[i%chords.length]; ch.forEach(f=>tone(f,bar*0.95, base, 'sine', 0.35)); tone(ch[1]*2, 0.6, base+0.5, 'triangle', 0.25); }
+      if(!ctx) return; const bpm=72; const bar=(60/bpm)*4; const chords=[[261.63,329.63,392.00],[220.00,261.63,329.63],[174.61,220.00,261.63],[196.00,246.94,293.66]]; const now=ctx.currentTime; for(let i=0;i<4;i++){ const base= now + i*bar; const ch=chords[i%chords.length]; ch.forEach(f=>tone(f,bar*0.95, base, 'sine', 0.35)); tone(ch[1]*2, 0.6, base+0.5, 'triangle', 0.25); }
       clearTimeout(loopTimer); loopTimer=setTimeout(scheduleMelody, bar*1000*4 - 80);
     }
     function tone(freq, dur, when, type='sine', vol=0.3){ const o=ctx.createOscillator(); const g=ctx.createGain(); o.type=type; o.frequency.value=freq; o.connect(g); g.connect(master); g.gain.setValueAtTime(0, when); g.gain.linearRampToValueAtTime(vol, when+0.03); g.gain.exponentialRampToValueAtTime(0.0001, when+dur); o.start(when); o.stop(when+dur+0.05); }
     function toggleMusic(){
-      if(!musicOn){
-        if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)(); master=ctx.createGain(); master.gain.value=0.06; master.connect(ctx.destination); }
-        ctx.resume(); scheduleMelody(); musicOn=true; $('#btnMusic').textContent='■ Müzik Durdur';
-      } else {
-        ctx.suspend(); clearTimeout(loopTimer); musicOn=false; $('#btnMusic').textContent='♪ Müzik';
-      }
+      if(!musicOn){ if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)(); master=ctx.createGain(); master.gain.value=0.06; master.connect(ctx.destination); }
+        ctx.resume(); scheduleMelody(); musicOn=true; $('#btnMusic').textContent='■ Müzik Durdur'; }
+      else { ctx.suspend(); clearTimeout(loopTimer); musicOn=false; $('#btnMusic').textContent='♪ Müzik'; }
     }
-    $('#btnMusic').addEventListener('click', toggleMusic);
-    document.addEventListener('visibilitychange',()=>{ if(document.hidden && ctx && musicOn){ ctx.suspend(); musicOn=false; $('#btnMusic').textContent='♪ Müzik'; } });
+    $('#btnMusic').addEventListener('click', toggleMusic, {passive:true});
 
     // Topbar helpers
-    $('#btnRain').addEventListener('click',()=>{ heartRain(false); vib(10); });
+    $('#btnRain').addEventListener('click',()=>{ heartRain(false); vib(8); }, {passive:true});
   </script>
 </body>
 </html>
