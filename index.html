@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Hediye Kalpler</title>
+<style>
+    body {
+        margin: 0;
+        background-color: #ffe6e6;
+        overflow: hidden;
+    }
+    canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+class Heart {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = canvas.height + 50;
+        this.size = 10 + Math.random() * 20;
+        this.speed = 1 + Math.random() * 3;
+        this.opacity = 1;
+        this.angle = Math.random() * Math.PI * 2;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.05;
+        this.sway = Math.random() * 2 - 1;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = `rgba(255,0,0,${this.opacity})`;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-this.size/5, -this.size/2, -this.size, this.size/3, 0, this.size);
+        ctx.bezierCurveTo(this.size, this.size/3, this.size/5, -this.size/2, 0, 0);
+        ctx.fill();
+        ctx.restore();
+    }
+    update() {
+        this.y -= this.speed;
+        this.x += Math.sin(this.angle) * 0.5 + this.sway;
+        this.angle += this.rotationSpeed;
+        this.opacity -= 0.01;
+    }
+}
+
+const hearts = [];
+
+function addHeart() {
+    hearts.push(new Heart());
+    if (hearts.length > 50) hearts.shift(); // Maks 50 kalp
+}
+
+function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hearts.forEach(h => {
+        h.update();
+        h.draw();
+    });
+    requestAnimationFrame(animate);
+}
+
+setInterval(addHeart, 200);
+animate();
+
+// Ekran boyutu değişirse canvas ayarla
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+</script>
+</body>
+</html>
