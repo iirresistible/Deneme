@@ -1,80 +1,440 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>Hediye Kalpler</title>
-<style>
-    body {
-        margin: 0;
-        background-color: #ffe6e6;
-        overflow: hidden;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🎁 Sürpriz Hediye & Kalp Yağmuru</title>
+  <style>
+    :root{
+      --bg1:#0f052d; --bg2:#250b5a; --bg3:#5b1aa6;
+      --accent:#ff3b8d; --accent2:#ffd166; --glow:#b388ff; --white:#fff;
     }
-    canvas { display: block; }
-</style>
+    *{box-sizing:border-box}
+    html,body{height:100%;}
+    body{
+      margin:0; font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 1200px at 80% -10%, var(--bg3), transparent),
+                  radial-gradient(800px 800px at 10% 110%, var(--bg2), transparent),
+                  linear-gradient(180deg, var(--bg1), #090215 60%);
+      color:var(--white); overflow:hidden;
+    }
+
+    /* Top bar */
+    .topbar{
+      position:fixed; inset:0 0 auto 0; height:64px; display:flex; align-items:center; justify-content:space-between; padding:0 16px 0 20px; z-index:40;
+      background: linear-gradient(90deg, rgba(255,59,141,0.14), rgba(179,136,255,0.10) 40%, rgba(255,209,102,0.10));
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,.12);
+    }
+    .brand{display:flex; gap:12px; align-items:center; font-weight:700; letter-spacing:.4px}
+    .brand .logo{width:36px; height:36px; display:grid; place-items:center; border-radius:12px; box-shadow:0 0 24px rgba(255,59,141,.55) inset, 0 0 30px rgba(255,59,141,.35);
+      background: radial-gradient(circle at 30% 30%, #ff7ab6, #ff3b8d 60%, #b80055)}
+    .brand span{font-size:18px}
+    .controls{display:flex; gap:10px}
+    .btn{
+      appearance:none; border:none; cursor:pointer; padding:10px 14px; border-radius:14px; font-weight:600; color:#0b0318;
+      background: linear-gradient(180deg, #ffe4f1, #ffc3de);
+      box-shadow: 0 10px 20px rgba(255,59,141,.25), 0 2px 0 rgba(0,0,0,.08) inset;
+      transition: transform .08s ease, box-shadow .2s ease;
+    }
+    .btn.secondary{background: linear-gradient(180deg, #fff3d6, #ffd166)}
+    .btn.ghost{color:var(--white); background:rgba(255,255,255,.08); box-shadow:none; border:1px solid rgba(255,255,255,.16)}
+    .btn:active{transform:translateY(1px)}
+
+    /* Hero */
+    .hero{
+      position:absolute; inset:64px 0 0 0; display:grid; place-items:center; padding:24px; pointer-events:none;
+    }
+    .hero-inner{ text-align:center; max-width:920px; pointer-events:auto;}
+    .headline{
+      font-size: clamp(28px, 6vw, 56px);
+      line-height:1.05; font-weight:800; letter-spacing:.3px;
+      text-shadow:0 6px 20px rgba(255,59,141,.35), 0 0 24px rgba(179,136,255,.25);
+    }
+    .headline .shimmer{background:linear-gradient(90deg, #fff, #ffd166, #ff7ab6, #fff);
+      -webkit-background-clip:text; background-clip:text; color:transparent; background-size:300% 100%; animation:shimmer 6s linear infinite}
+    @keyframes shimmer{0%{background-position:0% 0}100%{background-position:300% 0}}
+
+    .sub{opacity:.9; margin-top:10px; font-size: clamp(14px, 2.6vw, 20px)}
+
+    .cta{margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap}
+
+    /* Confetti & heart canvases */
+    canvas#confetti, canvas#hearts, canvas#spark{
+      position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:10;
+    }
+    canvas#hearts{z-index:9}
+    canvas#spark{z-index:8}
+
+    /* Modal */
+    .modal{position:fixed; inset:0; display:grid; place-items:center; z-index:50;}
+    .backdrop{position:absolute; inset:0; background:rgba(10,0,25,.65); backdrop-filter: blur(6px)}
+    .dialog{position:relative; z-index:1; width:min(560px, 92vw); border-radius:24px; padding:22px; text-align:center;
+      background: radial-gradient(120% 120% at 10% 0%, rgba(255,59,141,.26), rgba(179,136,255,.18) 60%, rgba(255,209,102,.16)),
+                  rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.22);
+      box-shadow: 0 30px 80px rgba(0,0,0,.45), 0 0 60px rgba(255,59,141,.25) inset;
+    }
+    .dialog h2{margin:8px 0 6px; font-size: clamp(22px, 4.8vw, 34px)}
+    .dialog p{opacity:.95}
+
+    /* Game HUD */
+    .hud{
+      position:fixed; right:16px; bottom:16px; z-index:30; display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .panel{
+      background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); padding:10px 12px; border-radius:14px; min-width:120px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .panel h4{margin:0 0 6px 0; font-size:12px; opacity:.85; letter-spacing:.5px; text-transform:uppercase}
+    .stat{font-size:18px; font-weight:700}
+
+    /* Floating heart emojis (decor) */
+    .float-emoji{position:fixed; font-size:24px; filter: drop-shadow(0 4px 10px rgba(255,0,102,.5)); pointer-events:none; z-index:12}
+
+    /* Win toast */
+    .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:-100px; z-index:60; padding:14px 16px; border-radius:16px;
+      background: linear-gradient(90deg, #ff3b8d, #ffd166); color:#2a0a36; font-weight:800; box-shadow:0 20px 60px rgba(0,0,0,.4);
+      transition:bottom .6s cubic-bezier(.2,.8,.2,1);
+    }
+    .toast.show{bottom:24px}
+
+    /* Footer note */
+    .footer{position:fixed; bottom:8px; left:12px; opacity:.7; font-size:12px}
+
+    /* Responsive safety */
+    @media (max-width:480px){
+      .btn{padding:10px 12px}
+      .panel{min-width:106px}
+    }
+  </style>
 </head>
 <body>
-<canvas id="canvas"></canvas>
-<script>
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+  <!-- Visual Canvases -->
+  <canvas id="spark"></canvas>
+  <canvas id="hearts"></canvas>
+  <canvas id="confetti"></canvas>
 
-class Heart {
-    constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = canvas.height + 50;
-        this.size = 10 + Math.random() * 20;
-        this.speed = 1 + Math.random() * 3;
-        this.opacity = 1;
-        this.angle = Math.random() * Math.PI * 2;
-        this.rotationSpeed = (Math.random() - 0.5) * 0.05;
-        this.sway = Math.random() * 2 - 1;
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">💖</div>
+      <span>Hediye Sürprizi</span>
+    </div>
+    <div class="controls">
+      <button class="btn" id="btnRain">💘 Kalp Yağmuru</button>
+      <button class="btn secondary" id="btnGame">🎮 Mini Oyun</button>
+      <button class="btn ghost" id="btnMusic">♪ Müzik</button>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="headline">
+        <span class="shimmer">Sürpriz Hediye</span> için hazır mısın?
+      </div>
+      <div class="sub">Açtığın anda ekran kalplerle dolacak; minik oyunda kalpleri topla, bombalardan kaç! Yüksek skor: <span id="bestScore">0</span></div>
+      <div class="cta">
+        <button class="btn" id="btnReveal">🎁 Hediyeyi Aç</button>
+        <button class="btn secondary" id="btnStartGame">🚀 Oyunu Başlat</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="panel">
+      <h4>Skor</h4>
+      <div class="stat" id="score">0</div>
+    </div>
+    <div class="panel">
+      <h4>Geri Sayım</h4>
+      <div class="stat" id="time">30</div>
+    </div>
+    <div class="panel">
+      <h4>Kombolar</h4>
+      <div class="stat" id="combo">x1</div>
+    </div>
+  </div>
+
+  <!-- Modal (first visit) -->
+  <div class="modal" id="intro">
+    <div class="backdrop"></div>
+    <div class="dialog">
+      <h2>✨ Minik bir sürprize <span style="color:var(--accent)">hoş geldin</span>!</h2>
+      <p>Butona basınca kalp yağmuru, parıltılar ve hediyen başlıyor. İstersen mini oyunda kalpleri tıkla ve rekoru kır! 💝</p>
+      <div class="cta" style="justify-content:center; margin-top:10px">
+        <button class="btn" id="introOpen">Hediyeyi Başlat</button>
+        <button class="btn secondary" id="introGame">Mini Oyuna Git</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Muhteşem! Rekor kırdın! 🏆</div>
+  <div class="footer">Made with 💗</div>
+
+  <script>
+    // ===== Helpers =====
+    const $ = sel => document.querySelector(sel);
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+    // ===== LocalStorage for best score =====
+    let best = parseInt(localStorage.getItem('giftBestScore')||'0');
+    const bestEl = $('#bestScore');
+    const setBest = v => {best = Math.max(best, v); bestEl.textContent = best; localStorage.setItem('giftBestScore', best)};
+    setBest(best);
+
+    // ===== Canvas setup =====
+    const spark = $('#spark'), hearts = $('#hearts'), confetti = $('#confetti');
+    const ctxS = spark.getContext('2d'), ctxH = hearts.getContext('2d'), ctxC = confetti.getContext('2d');
+    function fit(){
+      [spark,hearts,confetti].forEach(c=>{c.width=window.innerWidth; c.height=window.innerHeight});
     }
-    draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        ctx.fillStyle = `rgba(255,0,0,${this.opacity})`;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.bezierCurveTo(-this.size/5, -this.size/2, -this.size, this.size/3, 0, this.size);
-        ctx.bezierCurveTo(this.size, this.size/3, this.size/5, -this.size/2, 0, 0);
-        ctx.fill();
-        ctx.restore();
-    }
-    update() {
-        this.y -= this.speed;
-        this.x += Math.sin(this.angle) * 0.5 + this.sway;
-        this.angle += this.rotationSpeed;
-        this.opacity -= 0.01;
-    }
-}
+    window.addEventListener('resize', fit); fit();
 
-const hearts = [];
-
-function addHeart() {
-    hearts.push(new Heart());
-    if (hearts.length > 50) hearts.shift(); // Maks 50 kalp
-}
-
-function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    hearts.forEach(h => {
-        h.update();
-        h.draw();
+    // ===== Cursor Sparkles =====
+    const sparkles=[];
+    window.addEventListener('pointermove', e=>{
+      for(let i=0;i<4;i++){
+        sparkles.push({x:e.clientX, y:e.clientY, vx:(Math.random()-0.5)*2, vy: -Math.random()*2-1, life: 50+Math.random()*30});
+      }
+      // occasional floating emoji
+      if(Math.random()<0.06){ spawnEmoji(e.clientX,e.clientY); }
     });
-    requestAnimationFrame(animate);
-}
 
-setInterval(addHeart, 200);
-animate();
+    function drawSpark(){
+      ctxS.clearRect(0,0,spark.width,spark.height);
+      for(let i=sparkles.length-1;i>=0;i--){
+        const p = sparkles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.03; p.life-=1.8;
+        const alpha = clamp(p.life/80,0,1);
+        ctxS.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctxS.beginPath(); ctxS.arc(p.x,p.y,2+alpha*2,0,Math.PI*2); ctxS.fill();
+        if(p.life<=0) sparkles.splice(i,1);
+      }
+    }
 
-// Ekran boyutu değişirse canvas ayarla
-window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-});
-</script>
+    // ===== Heart Rain & Burst =====
+    const drops=[];
+    function spawnHeart(x=Math.random()*hearts.width, burst=false){
+      const size = burst? (20+Math.random()*30) : (8+Math.random()*18);
+      drops.push({x, y: -size, vy: 1+Math.random()*2.5, rot: Math.random()*Math.PI, vr:(Math.random()-.5)*0.03, size});
+    }
+    function heartPath(ctx, x, y, s){
+      ctx.beginPath();
+      const k = s/16; // scale
+      ctx.moveTo(x, y+2*k);
+      ctx.bezierCurveTo(x-7*k, y-6*k, x-16*k, y+4*k, x, y+14*k);
+      ctx.bezierCurveTo(x+16*k, y+4*k, x+7*k, y-6*k, x, y+2*k);
+      ctx.closePath();
+    }
+    function drawHearts(){
+      ctxH.clearRect(0,0,hearts.width,hearts.height);
+      for(let i=drops.length-1;i>=0;i--){
+        const d = drops[i]; d.y+=d.vy; d.rot+=d.vr;
+        ctxH.save(); ctxH.translate(d.x,d.y); ctxH.rotate(d.rot);
+        const grd = ctxH.createRadialGradient(0,0,1,0,0,d.size);
+        grd.addColorStop(0,'rgba(255,255,255,.95)');
+        grd.addColorStop(.2,'#ff7ab6');
+        grd.addColorStop(1,'#ff3b8d');
+        ctxH.fillStyle=grd; heartPath(ctxH,0,0,d.size); ctxH.fill();
+        ctxH.restore();
+        if(d.y>hearts.height+d.size) drops.splice(i,1);
+      }
+    }
+    let rainTimer=null;
+    function burst(n=120){ for(let i=0;i<n;i++){ setTimeout(()=>spawnHeart(Math.random()*hearts.width,true), i*3); } }
+
+    // ===== Confetti =====
+    const confs=[];
+    function spawnConfetti(x,y,amount=120){
+      for(let i=0;i<amount;i++){
+        const ang = Math.random()*Math.PI*2;
+        const spd = 2+Math.random()*5;
+        confs.push({x,y,vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd-2, w:4+Math.random()*6, h:2+Math.random()*4, r:Math.random()*Math.PI, vr:(Math.random()-.5)*0.2, life:160+Math.random()*80, hue: ~~(Math.random()*360)});
+      }
+    }
+    function drawConfetti(){
+      ctxC.clearRect(0,0,confetti.width,confetti.height);
+      for(let i=confs.length-1;i>=0;i--){
+        const c=confs[i]; c.x+=c.vx; c.y+=c.vy; c.vy+=0.05; c.r+=c.vr; c.life-=1.6;
+        ctxC.save(); ctxC.translate(c.x,c.y); ctxC.rotate(c.r);
+        ctxC.fillStyle = `hsl(${c.hue} 90% 60% / ${clamp(c.life/200,0,1)})`;
+        ctxC.fillRect(-c.w/2,-c.h/2,c.w,c.h);
+        ctxC.restore();
+        if(c.life<=0 || c.y>confetti.height+20) confs.splice(i,1);
+      }
+    }
+
+    // ===== Floating emoji =====
+    function spawnEmoji(x,y){
+      const el = document.createElement('div');
+      el.className='float-emoji';
+      el.textContent = Math.random()<0.5? '💖' : '✨';
+      document.body.appendChild(el);
+      el.style.left = x+'px'; el.style.top = y+'px';
+      const tx = x + (Math.random()*200-100);
+      const ty = y - (100 + Math.random()*140);
+      el.animate([
+        { transform:`translate(0,0) scale(1)`, opacity:1 },
+        { transform:`translate(${tx-x}px, ${ty-y}px) scale(1.6)`, opacity:0 }
+      ], { duration:1200, easing:'cubic-bezier(.2,.8,.2,1)' });
+      setTimeout(()=>el.remove(), 1200);
+    }
+
+    // ===== Mini Game =====
+    /* Click/tap the hearts to score. Avoid bombs. 30s timer. Combos for quick clicks. */
+    const game = { active:false, score:0, time:30, combo:1, lastClick:0 };
+    const scoreEl=$('#score'), timeEl=$('#time'), comboEl=$('#combo');
+
+    // Entities for game
+    const items=[]; // {x,y,vx,vy,type,size,life}
+    function spawnItem(){
+      const isBomb = Math.random()<0.15; // 15% bombs
+      const size = isBomb? 22+Math.random()*22 : 18+Math.random()*20;
+      items.push({ x: Math.random()*hearts.width, y: -40, vx:(Math.random()-.5)*0.6, vy: 1.2+Math.random()*1.8, type: isBomb?'bomb':'heart', size, life: 900});
+    }
+
+    function drawGame(){
+      // draw items on hearts canvas on top of rain
+      for(let i=items.length-1;i>=0;i--){
+        const it=items[i]; it.x+=it.vx; it.y+=it.vy; it.vy+=0.002; it.life--;
+        ctxH.save(); ctxH.translate(it.x,it.y);
+        if(it.type==='heart'){
+          ctxH.rotate(Math.sin(it.y/40)*.2);
+          const grd = ctxH.createRadialGradient(0,0,1,0,0,it.size);
+          grd.addColorStop(0,'rgba(255,255,255,.95)'); grd.addColorStop(.2,'#ffd6e9'); grd.addColorStop(1,'#ff3b8d');
+          ctxH.fillStyle=grd; heartPath(ctxH,0,0,it.size); ctxH.fill();
+        } else {
+          // Bomb: dark circle with fuse
+          const s=it.size; ctxH.fillStyle='rgba(10,0,20,.9)'; ctxH.beginPath(); ctxH.arc(0,0,s*0.58,0,Math.PI*2); ctxH.fill();
+          ctxH.fillStyle='#ffcc00'; ctxH.fillRect(-1,-s*0.8,2,s*0.3); // fuse
+          ctxH.fillStyle='#ff6600'; ctxH.beginPath(); ctxH.arc(0,-s*0.9,3,0,Math.PI*2); ctxH.fill();
+        }
+        ctxH.restore();
+        // remove if off-screen or old
+        if(it.y>hearts.height+60 || it.life<=0) items.splice(i,1);
+      }
+    }
+
+    hearts.addEventListener('pointerdown', (e)=>{
+      if(!game.active) return;
+      const rect = hearts.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      // find nearest clickable
+      for(let i=items.length-1;i>=0;i--){
+        const it=items[i];
+        const dx=it.x - x, dy=it.y - y; const dist = Math.hypot(dx,dy);
+        if(dist < (it.size*0.8)){
+          if(it.type==='heart'){
+            // combo logic
+            const now = performance.now();
+            if(now - game.lastClick < 450){ game.combo = Math.min(game.combo+1, 8); } else { game.combo = 1; }
+            game.lastClick = now;
+            const gain = 10*game.combo; game.score += gain; updateHUD();
+            spawnConfetti(it.x,it.y, 24+game.combo*6);
+            burst(8+game.combo*2);
+            floatingLabel(`+${gain}`, it.x, it.y, '#ffd166');
+          } else {
+            game.score = Math.max(0, game.score-15); game.combo = 1; updateHUD();
+            screenShake(); floatingLabel('💥 -15', x, y, '#ff3b8d');
+          }
+          items.splice(i,1); break;
+        }
+      }
+    });
+
+    function floatingLabel(text,x,y,color){
+      const el=document.createElement('div'); el.textContent=text; el.style.position='fixed'; el.style.left=x+'px'; el.style.top=y+'px'; el.style.fontWeight='800'; el.style.pointerEvents='none'; el.style.zIndex=45;
+      el.style.filter='drop-shadow(0 6px 16px rgba(0,0,0,.6))'; el.style.color=color; document.body.appendChild(el);
+      el.animate([{transform:'translate(-50%,-50%) scale(1)', opacity:1},{transform:'translate(-50%,-140%) scale(1.4)', opacity:0}], {duration:900, easing:'cubic-bezier(.2,.8,.2,1)'});
+      setTimeout(()=>el.remove(), 900);
+    }
+
+    function screenShake(){
+      document.body.animate([{transform:'translate(0,0)'},{transform:'translate(2px,-2px)'},{transform:'translate(-2px,2px)'},{transform:'translate(0,0)'}],{duration:250});
+    }
+
+    // HUD
+    function updateHUD(){
+      scoreEl.textContent = game.score;
+      timeEl.textContent = game.time;
+      comboEl.textContent = 'x'+game.combo;
+    }
+
+    // Game loop & timers
+    let raf; function loop(){ drawSpark(); drawHearts(); if(game.active) drawGame(); raf=requestAnimationFrame(loop); }
+    loop();
+
+    let spawnInt, timeInt;
+    function startGame(){
+      if(game.active) return; // prevent double
+      game.active=true; game.score=0; game.time=30; game.combo=1; items.length=0; updateHUD();
+      // spawners
+      spawnInt = setInterval(()=>{
+        // dynamic density
+        for(let i=0;i< (1 + Math.floor(Math.random()*3)); i++){ spawnItem(); }
+      }, 420);
+      timeInt = setInterval(()=>{
+        game.time--; updateHUD();
+        if(game.time<=0){ endGame(); }
+      }, 1000);
+      burst(50); spawnConfetti(innerWidth*0.5, innerHeight*0.35, 160);
+    }
+    function endGame(){
+      game.active=false; clearInterval(spawnInt); clearInterval(timeInt);
+      setBest(game.score);
+      if(game.score>=best){ showToast('Muhteşem! Rekor kırdın! 🏆'); }
+      else { showToast('Harika oynadın! 🎉'); }
+    }
+
+    function showToast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400); }
+
+    // ===== Buttons =====
+    $('#btnReveal').addEventListener('click', ()=>{ burst(180); spawnConfetti(innerWidth*0.5, innerHeight*0.33, 200); heartRain(true); });
+    $('#btnStartGame').addEventListener('click', startGame);
+    $('#btnGame').addEventListener('click', startGame);
+
+    function heartRain(toggle){
+      if(rainTimer){ clearInterval(rainTimer); rainTimer=null; return; }
+      if(toggle){
+        rainTimer = setInterval(()=>{ for(let i=0;i<8;i++) spawnHeart(); }, 140);
+        setTimeout(()=>{ if(rainTimer){ clearInterval(rainTimer); rainTimer=null; } }, 8000);
+      } else {
+        rainTimer = setInterval(()=>{ for(let i=0;i<6;i++) spawnHeart(); }, 160);
+      }
+    }
+    $('#btnRain').addEventListener('click', ()=>{
+      if(rainTimer){ clearInterval(rainTimer); rainTimer=null; } else { heartRain(false); }
+    });
+
+    // Intro modal
+    const intro = $('#intro');
+    function openIntro(){ intro.style.display='grid'; }
+    function closeIntro(){ intro.style.display='none'; }
+    $('#introOpen').addEventListener('click', ()=>{ closeIntro(); burst(220); spawnConfetti(innerWidth*0.5, innerHeight*0.38, 250); heartRain(true); });
+    $('#introGame').addEventListener('click', ()=>{ closeIntro(); startGame(); });
+
+    // Show intro only first visit (per session)
+    if(!sessionStorage.getItem('giftIntro')){ openIntro(); sessionStorage.setItem('giftIntro','1'); }
+
+    // ===== Optional: music (user-gesture required) =====
+    let audio; let playing=false;
+    function toggleMusic(){
+      if(!audio){
+        audio = new Audio();
+        // tiny data-URI melody (royalty-free styled), simple beep tune
+        audio.src = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQAA..."; // placeholder silent-ish data (very short)
+        audio.loop=true; audio.volume=0.25;
+      }
+      if(!playing){ audio.play().catch(()=>{}); playing=true; $('#btnMusic').textContent='■ Müzik Durdur'; }
+      else { audio.pause(); playing=false; $('#btnMusic').textContent='♪ Müzik'; }
+    }
+    $('#btnMusic').addEventListener('click', toggleMusic);
+
+    // Safety: pause music when page hidden
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden && audio && !audio.paused){ audio.pause(); playing=false; $('#btnMusic').textContent='♪ Müzik'; } });
+
+  </script>
 </body>
 </html>
